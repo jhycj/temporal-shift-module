@@ -5,8 +5,8 @@
 
 import os
 
-ROOT_DATASET = '/ssd/video/'  # '/data/jilin/'
-
+#ROOT_DATASET = '/home/heeyoung/repos/kinetics-downloader/'  # '/data/jilin/'
+ROOT_DATASET = '../'
 
 def return_ucf101(modality):
     filename_categories = 'UCF101/labels/classInd.txt'
@@ -92,19 +92,42 @@ def return_jester(modality):
 def return_kinetics(modality):
     filename_categories = 400
     if modality == 'RGB':
+        '''
         root_data = ROOT_DATASET + 'kinetics/images'
         filename_imglist_train = 'kinetics/labels/train_videofolder.txt'
         filename_imglist_val = 'kinetics/labels/val_videofolder.txt'
+        '''
+    
+        root_data = ROOT_DATASET + 'imgs/valid'
+        filename_imglist_train = 'resources/train_videofolder.txt' 
+        filename_imglist_val = 'resources/val_videofolder.txt'
+
         prefix = 'img_{:05d}.jpg'
     else:
         raise NotImplementedError('no such modality:' + modality)
     return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
 
 
+def return_imiGUE(modality): 
+    filename_categories = 33
+    
+    if modality == 'RGB': 
+        root_data = '../imiGUE_imgs' 
+        filename_imglist_train = 'imiGUE_resources/train_videofolder.txt'
+        filename_imglist_val = 'imiGUE_resources/valid_videofolder.txt'
+        prefix = 'img_{:05d}.jpg'
+    
+    else:
+        raise NotImplementedError('no such modality:' + modality)
+    
+    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+
 def return_dataset(dataset, modality):
     dict_single = {'jester': return_jester, 'something': return_something, 'somethingv2': return_somethingv2,
                    'ucf101': return_ucf101, 'hmdb51': return_hmdb51,
-                   'kinetics': return_kinetics }
+                   'kinetics': return_kinetics,
+                   'imiGUE': return_imiGUE }
+
     if dataset in dict_single:
         file_categories, file_imglist_train, file_imglist_val, root_data, prefix = dict_single[dataset](modality)
     else:

@@ -72,21 +72,27 @@ def class_process(dir_path, dst_dir_path, class_name):
     p.join()
     
     print('\n')
-    
 
-if __name__ == "__main__":
-    dir_path = sys.argv[1]  # ../dataset/valid    # ../dataset
-    dst_dir_path = sys.argv[2] # ../imgs/valid    # ../imgs/
 
+def run(dir_path, dst_dir_path): 
     class_list = os.listdir(dir_path)
     class_list.sort()
-    
     
     for class_name in class_list:
         print(class_name) 
         class_process(dir_path, dst_dir_path, class_name)
     
-    '''
-    class_name = 'test'
-    class_process(dir_path, dst_dir_path, class_name)
-    '''
+
+if __name__ == "__main__":
+
+    run('../imiGUE_dataset/train', '../imiGUE_imgs/train')
+    run('../imiGUE_dataset/valid', '../imiGUE_imgs/valid')
+
+
+
+
+
+
+
+    
+  

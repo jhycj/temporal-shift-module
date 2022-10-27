@@ -127,7 +127,7 @@ def make_temporal_shift(net, n_segment, n_div=8, place='blockres', temporal_pool
                 blocks = list(stage.children())
                 print('=> Processing stage with {} blocks residual'.format(len(blocks)))
                 for i, b in enumerate(blocks):
-                    if i % n_round == 0:
+                    if i % n_round == 0: # for only if i== 2*x 
                         blocks[i].conv1 = TemporalShift(b.conv1, n_segment=this_segment, n_div=n_div)
                 return nn.Sequential(*blocks)
 

@@ -17,15 +17,15 @@ class VideoRecord(object):
 
     @property
     def path(self):
-        return self._data[0]
+        return self._data[0] # carrying_baby/RMNaIRvawIE
 
     @property
     def num_frames(self):
-        return int(self._data[1])
+        return int(self._data[1]) # 300
 
     @property
     def label(self):
-        return int(self._data[2])
+        return int(self._data[2]) # 44
 
 
 class TSNDataSet(data.Dataset):
@@ -93,7 +93,9 @@ class TSNDataSet(data.Dataset):
 
     def _parse_list(self):
         # check the frame number is large >3:
-        tmp = [x.strip().split(' ') for x in open(self.list_file)]
+        tmp = [x.strip().split(' ') for x in open(self.list_file)] 
+        # [['carrying_baby/-3I-5fQwkbo', '300', '44'], ['carrying_baby/-AiEBWTeJ9M', '300', '44'], ...]  
+        #print(tmp)
         if not self.test_mode or self.remove_missing:
             tmp = [item for item in tmp if int(item[1]) >= 3]
         self.video_list = [VideoRecord(item) for item in tmp]
@@ -101,7 +103,7 @@ class TSNDataSet(data.Dataset):
         if self.image_tmpl == '{:06d}-{}_{:05d}.jpg':
             for v in self.video_list:
                 v._data[1] = int(v._data[1]) / 2
-        print('video number:%d' % (len(self.video_list)))
+        print('video number:%d' % (len(self.video_list))) # 21 
 
     def _sample_indices(self, record):
         """
@@ -169,9 +171,11 @@ class TSNDataSet(data.Dataset):
         if self.image_tmpl == 'flow_{}_{:05d}.jpg':
             file_name = self.image_tmpl.format('x', 1)
             full_path = os.path.join(self.root_path, record.path, file_name)
+            
         elif self.image_tmpl == '{:06d}-{}_{:05d}.jpg':
             file_name = self.image_tmpl.format(int(record.path), 'x', 1)
             full_path = os.path.join(self.root_path, '{:06d}'.format(int(record.path)), file_name)
+
         else:
             file_name = self.image_tmpl.format(1)
             full_path = os.path.join(self.root_path, record.path, file_name)

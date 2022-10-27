@@ -41,14 +41,6 @@ class GroupCenterCrop(object):
     def __call__(self, img_group):
         return [self.worker(img) for img in img_group]
 
-class GroupResize(object):
-    def __init__(self, size):
-        self.worker = torchvision.transforms.Resize(size)
-
-    def __call__(self, img_group):
-        return [self.worker(img) for img in img_group]
-
-
 
 class GroupRandomHorizontalFlip(object):
     """Randomly horizontally flips the given PIL.Image with a probability of 0.5
@@ -348,6 +340,7 @@ class IdentityTransform(object):
 
 
 if __name__ == "__main__":
+    '''
     trans = torchvision.transforms.Compose([
         GroupScale(256),
         GroupRandomCrop(224),
@@ -376,3 +369,22 @@ if __name__ == "__main__":
             std=[.229, .224, .225])
     ])
     print(trans2(color_group))
+    '''
+
+    img = Image.open('imiGUE_imgs/train/28/trimmed_342_43_48_28_win/img_00007.jpg')
+    
+    h = img.size[1] 
+    print(h)
+    color_group = [img] * 3 
+    trans = torchvision.transforms.Compose([
+        GroupCenterCrop(331)
+    ])
+    
+    output = trans(color_group) 
+    import cv2
+    for i, pil_img in enumerate(output): 
+        cv_img = np.array(pil_img) 
+        cv_img = cv_img[:,:,::-1].copy()
+        #print(cv_img.shape)
+
+        cv2.imwrite(f'{i}.jpg', cv_img)

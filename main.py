@@ -27,9 +27,18 @@ best_prec1 = 0
 def main():
     global args, best_prec1
     args = parser.parse_args()
-
     num_class, args.train_list, args.val_list, args.root_path, prefix = dataset_config.return_dataset(args.dataset,
                                                                                                       args.modality)
+    print('--------------')
+    print(f'num_class:{num_class}') # 32
+    print(f'args.train_list: {args.train_list}') #../imiGUE_resources/train_videofolder.txt
+    print(f'args.val_list: {args.val_list}') # ../imiGUE_resources/train_videofolder.txt
+    print(f'args.root_path: {args.root_path}') # ../imiGUE_imgs
+    print(f'args.batch_size: {args.batch_size}') # 4
+    print(f'args.arch: {args.arch}') # resnet 50
+    print(f'args.consensus_type : {args.consensus_type}')
+    print('--------------')    
+    
     full_arch_name = args.arch
     if args.shift:
         full_arch_name += '_shift{}_{}'.format(args.shift_div, args.shift_place)
@@ -69,7 +78,7 @@ def main():
     input_mean = model.input_mean
     input_std = model.input_std
     policies = model.get_optim_policies()
-    train_augmentation = model.get_augmentation(flip=False if 'something' in args.dataset or 'jester' in args.dataset else True)
+    train_augmentation = model.get_augmentation(flip=False if 'something' in args.dataset or 'jester' or 'imiGUE' in args.dataset else True)
 
     model = torch.nn.DataParallel(model, device_ids=args.gpus).cuda()
 
@@ -92,6 +101,7 @@ def main():
                    .format(args.evaluate, checkpoint['epoch'])))
         else:
             print(("=> no checkpoint found at '{}'".format(args.resume)))
+
 
     if args.tune_from:
         print(("=> fine-tuning from '{}'".format(args.tune_from)))
@@ -135,39 +145,42 @@ def main():
 
     if args.modality == 'RGB':
         data_length = 1
+        
     elif args.modality in ['Flow', 'RGBDiff']:
         data_length = 5
 
     train_loader = torch.utils.data.DataLoader(
-        TSNDataSet(args.root_path, args.train_list, num_segments=args.num_segments,
+        TSNDataSet(args.root_path+ '/train', args.train_list, num_segments=args.num_segments,
                    new_length=data_length,
                    modality=args.modality,
                    image_tmpl=prefix,
                    transform=torchvision.transforms.Compose([
-                       train_augmentation,
-                       Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
-                       ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])),
-                       normalize,
-                   ]), dense_sample=args.dense_sample),
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True,
-        drop_last=True)  # prevent something not % n_GPU
-
-    val_loader = torch.utils.data.DataLoader(
-        TSNDataSet(args.root_path, args.val_list, num_segments=args.num_segments,
-                   new_length=data_length,
-                   modality=args.modality,
-                   image_tmpl=prefix,
-                   random_shift=False,
-                   transform=torchvision.transforms.Compose([
-                       GroupScale(int(scale_size)),
-                       GroupCenterCrop(crop_size),
-                       Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
-                       ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])),
-                       normalize,
+                        GroupCenterCrop(331),
+                        GroupResize(224),
+                        Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
+                        ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])),
+                        normalize,
                    ]), dense_sample=args.dense_sample),
         batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True,
+        )  # prevent something not % n_GPU
+
+    val_loader = torch.utils.data.DataLoader(
+        TSNDataSet(args.root_path + '/valid', args.val_list, num_segments=args.num_segments,
+                    new_length=data_length,
+                    modality=args.modality,
+                    image_tmpl=prefix,
+                    random_shift=False,
+                    transform=torchvision.transforms.Compose([
+                        GroupCenterCrop(331),
+                        GroupResize(224),
+                       Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])), # False
+                       ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])), # true
+                       normalize,
+                   ]), 
+                   dense_sample=args.dense_sample),
+                    batch_size=args.batch_size, shuffle=False,
+                    num_workers=args.workers, pin_memory=True)
 
     # define loss function (criterion) and optimizer
     if args.loss_type == 'nll':
@@ -180,6 +193,7 @@ def main():
             group['name'], len(group['params']), group['lr_mult'], group['decay_mult'])))
 
     if args.evaluate:
+        print('----evaluate start')
         validate(val_loader, model, criterion, 0)
         return
 
@@ -187,14 +201,18 @@ def main():
     with open(os.path.join(args.root_log, args.store_name, 'args.txt'), 'w') as f:
         f.write(str(args))
     tf_writer = SummaryWriter(log_dir=os.path.join(args.root_log, args.store_name))
+
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.lr_type, args.lr_steps)
-
+       
         # train for one epoch
+        print('-----train start------')
         train(train_loader, model, criterion, optimizer, epoch, log_training, tf_writer)
+        print('======train is finished======')
 
         # evaluate on validation set
         if (epoch + 1) % args.eval_freq == 0 or epoch == args.epochs - 1:
+            print('----validation---')
             prec1 = validate(val_loader, model, criterion, epoch, log_training, tf_writer)
 
             # remember best prec@1 and save checkpoint
@@ -217,6 +235,7 @@ def main():
 
 
 def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
+
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -233,6 +252,8 @@ def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
+      
+        #print(input.shape)
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -262,7 +283,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
+        
         if i % args.print_freq == 0:
             output = ('Epoch: [{0}][{1}/{2}], lr: {lr:.5f}\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -272,10 +293,10 @@ def train(train_loader, model, criterion, optimizer, epoch, log, tf_writer):
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                 epoch, i, len(train_loader), batch_time=batch_time,
                 data_time=data_time, loss=losses, top1=top1, top5=top5, lr=optimizer.param_groups[-1]['lr'] * 0.1))  # TODO
-            print(output)
+            #print(output)
             log.write(output + '\n')
             log.flush()
-
+        
     tf_writer.add_scalar('loss/train', losses.avg, epoch)
     tf_writer.add_scalar('acc/train_top1', top1.avg, epoch)
     tf_writer.add_scalar('acc/train_top5', top5.avg, epoch)
@@ -294,6 +315,8 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
     end = time.time()
     with torch.no_grad():
         for i, (input, target) in enumerate(val_loader):
+            #print(i)
+            #print(input.shape)
             target = target.cuda()
 
             # compute output
@@ -310,7 +333,7 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-
+            
             if i % args.print_freq == 0:
                 output = ('Test: [{0}/{1}]\t'
                           'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -319,11 +342,11 @@ def validate(val_loader, model, criterion, epoch, log=None, tf_writer=None):
                           'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                     i, len(val_loader), batch_time=batch_time, loss=losses,
                     top1=top1, top5=top5))
-                print(output)
+                #print(output)
                 if log is not None:
                     log.write(output + '\n')
                     log.flush()
-
+            
     output = ('Testing Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
               .format(top1=top1, top5=top5, loss=losses))
     print(output)
@@ -368,11 +391,12 @@ def check_rootfolders():
     folders_util = [args.root_log, args.root_model,
                     os.path.join(args.root_log, args.store_name),
                     os.path.join(args.root_model, args.store_name)]
+    
     for folder in folders_util:
         if not os.path.exists(folder):
             print('creating folder ' + folder)
             os.mkdir(folder)
-
+        
 
 if __name__ == '__main__':
     main()

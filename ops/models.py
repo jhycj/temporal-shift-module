@@ -18,6 +18,7 @@ class TSN(nn.Module):
                  crop_num=1, partial_bn=True, print_spec=True, pretrain='imagenet',
                  is_shift=False, shift_div=8, shift_place='blockres', fc_lr5=False,
                  temporal_pool=False, non_local=False):
+                 
         super(TSN, self).__init__()
         self.modality = modality
         self.num_segments = num_segments
